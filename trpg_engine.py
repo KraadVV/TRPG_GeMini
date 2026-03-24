@@ -1,61 +1,5 @@
-import json
-import os
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
-
-load_dotenv()
-client = genai.Client()
-
-SAVE_FILE = "save_file.json"
-
-def load_save():
-    if os.path.exists(SAVE_FILE):
-        with open(SAVE_FILE, "r") as f:
-            return json.load(f)
-    else:
-        default_state = {
-            "name": "Peter",
-            "hp": 20,
-            "level": 1,
-            "inventory": ["Iron Sword", "Leather Armor", "Health Potion"],
-            "location": "The Crossroads",
-            "history": [] 
-        }
-        save_game(default_state)
-        return default_state
-
-def save_game(state):
-    with open(SAVE_FILE, "w") as f:
-        json.dump(state, f, indent=4)
-
-def generate_gm_response(state, player_action):
-    prompt = f"""
-    You are the Game Master in a text-based RPG. 
-    Here is the player's current character sheet and state:
-    {json.dumps(state, indent=2)}
-    
-    The player takes the following action: "{player_action}"
-    
-    Process the action and return a JSON object with exactly the following keys:
-    1. "narrative": A string describing the outcome of the action and the new situation.
-    2. "choices": A list of 3 strings representing the player's next logical options.
-    3. "updated_hp": An integer of the player's new HP (subtract if they take damage, add if they heal).
-    4. "updated_inventory": A list of strings of the player's new inventory (add/remove items based on the narrative).
-    5. "updated_location": A string of the current location name.
-    """
-    
-    # We pass the types config to force the API to output strict JSON
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-        )
-    )
-    
-    # Python takes the JSON string from the API and converts it into a usable dictionary
-    return json.loads(response.text)
+from game_state import load_save, save_game
+from gm_engine import generate_gm_response
 
 def main():
     print("=== CLI TRPG ENGINE: AUTO-DM UPGRADE ===")
@@ -90,17 +34,30 @@ def main():
             break
         
         print("\n" + "="*50)
-        action = input("\nWhat do you do? (Type 1, 2, 3, or type a custom action): ")
         
-        if action.lower() == 'quit':
-            print("Saving and exiting...")
+        while True:
+            action = input("\nWhat do you do? (Type 1, 2, 3, 'status', 'quit', or a custom action): ")
+            
+            if action.lower() == 'quit':
+                print("Saving and exiting...")
+                return
+            
+            if action.lower() in ['status', 'inventory', 'stats']:
+                print("\n=== CHARACTER STATUS ===")
+                print(f"Name: {state['name']} (Level {state['level']})")
+                print(f"HP: {state['hp']}")
+                print(f"Location: {state['location']}")
+                print(f"Inventory: {', '.join(state['inventory'])}")
+                print("========================")
+                continue
+            
+            # If the user typed a number, map it to the actual choice string
+            if action in ['1', '2', '3']:
+                initial_action = gm_data['choices'][int(action) - 1]
+            else:
+                initial_action = action
+            
             break
-        
-        # If the user typed a number, map it to the actual choice string
-        if action in ['1', '2', '3']:
-            initial_action = gm_data['choices'][int(action) - 1]
-        else:
-            initial_action = action
         
         state["history"].append(initial_action)
         if len(state["history"]) > 5:
