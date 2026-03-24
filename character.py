@@ -75,7 +75,7 @@ def create_character():
         "equipped_weapon": weapon, "equipped_armor": "None",
         "hp": max_hp, "max_hp": max_hp, "level": 1, "xp": 0, "gold": 50,
         "stats": stats, "inventory": [weapon, "Adventurer's Pack", "Health Potion"],
-        "location": "The Crossroads", "history": []
+        "location": "The Town", "history": [], "companions": []
     }
     print(f"\nWelcome, {name} the {race} {char_class}! Your adventure begins now.\n")
     return state

@@ -1,3 +1,6 @@
+import re
+import random
+
 def show_status(state):
     print("\n=== CHARACTER STATUS ===")
     print(f"Name: {state['name']}")
@@ -10,6 +13,8 @@ def show_status(state):
         print(f"STR: {s['STR']} | DEX: {s['DEX']} | CON: {s['CON']} | INT: {s['INT']} | WIS: {s['WIS']} | CHA: {s['CHA']}")
     print(f"Equipped: [Weapon: {state.get('equipped_weapon', 'None')}] [Armor: {state.get('equipped_armor', 'None')}]")
     print(f"Location: {state['location']}")
+    if state.get('companions'):
+        print(f"Companions: {', '.join(state['companions'])}")
     print(f"Inventory: {', '.join(state['inventory'])}")
     print("========================")
 
@@ -40,4 +45,56 @@ def handle_equip(state):
         elif slot == 'a': state['equipped_armor'] = item_to_equip; print(f"Equipped {item_to_equip} as your armor."); return True
     elif item_to_equip:
         print("\n[Failed] You don't have that item in your inventory.")
+    return False
+
+def handle_use(state, game_data):
+    print("\n=== USE ITEM ===")
+    print(f"Inventory: {', '.join(state['inventory'])}")
+    item_to_use = input("Enter the name of the item to use (or press Enter to cancel): ").title()
+    
+    if item_to_use in state['inventory']:
+        item_info = game_data.get('items', {}).get(item_to_use)
+        if item_info and ('Heal' in item_info['description'] or 'heal' in item_info['description'].lower()):
+            desc = item_info['description']
+            # Parse healing amount, e.g., 2d4+2
+            match = re.search(r'(\d+)d(\d+)\+?(\d*)', desc)
+            if match:
+                num_dice = int(match.group(1))
+                dice_sides = int(match.group(2))
+                bonus = int(match.group(3)) if match.group(3) else 0
+                heal_amount = sum(random.randint(1, dice_sides) for _ in range(num_dice)) + bonus
+            else:
+                heal_amount = 5 # Default fallback
+            
+            old_hp = state['hp']
+            state['hp'] = min(state.get('max_hp', state['hp']), state['hp'] + heal_amount)
+            healed = state['hp'] - old_hp
+            state['inventory'].remove(item_to_use)
+            print(f"\n[Success] You consumed the {item_to_use} and recovered {healed} HP! (Current HP: {state['hp']}/{state['max_hp']})")
+            return True
+        else:
+            print(f"\n[Failed] {item_to_use} cannot be used this way or is not a known consumable.")
+    elif item_to_use:
+        print("\n[Failed] You don't have that item in your inventory.")
+    return False
+
+def handle_rest(state):
+    print("\n=== REST ===")
+    print("1. Short Rest (Heal half of your Max HP, can be done anywhere)")
+    print("2. Long Rest (Heal to full HP, requires a safe location)")
+    choice = input("Choose a rest type (1/2, or press Enter to cancel): ")
+    
+    if choice == '1':
+        heal_amount = max(1, state.get('max_hp', 10) // 2)
+        old_hp = state['hp']
+        state['hp'] = min(state.get('max_hp', state['hp']), state['hp'] + heal_amount)
+        print(f"\n[Success] You took a short rest and recovered {state['hp'] - old_hp} HP! (Current HP: {state['hp']}/{state['max_hp']})")
+        return True
+    elif choice == '2':
+        if state.get('is_safe', False) or state.get('can_shop', False):
+            state['hp'] = state.get('max_hp', state['hp'])
+            print(f"\n[Success] You took a long rest in a safe place. You are fully healed! (Current HP: {state['hp']}/{state['max_hp']})")
+            return True
+        else:
+            print("\n[Failed] It's too dangerous to take a Long Rest here! Find a town, inn, or secure camp.")
     return False

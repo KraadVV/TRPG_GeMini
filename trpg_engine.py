@@ -1,8 +1,9 @@
-from game_state import load_save, save_game, load_game_data
+from game_state import load_save, save_game, load_game_data, save_game_data
 from gm_engine import generate_gm_response
 import character
 import combat
 import actions
+import skills
 
 def main():
     print("=== CLI TRPG ENGINE: AUTO-DM UPGRADE ===")
@@ -27,6 +28,9 @@ def main():
             state['hp'] = gm_data['updated_hp']
             state['inventory'] = gm_data['updated_inventory']
             state['location'] = gm_data['updated_location']
+            state['can_shop'] = gm_data.get('can_shop', False)
+            state['is_safe'] = gm_data.get('is_safe', False)
+            state['companions'] = gm_data.get('updated_companions', state.get('companions', []))
             
             gained_xp = gm_data.get('awarded_xp', 0)
             character.check_level_up(state, gained_xp)
@@ -34,11 +38,22 @@ def main():
             # 2. Print the UI
             print(f"📍 Location: {state['location']}")
             print(f"❤️  HP: {state['hp']} | 🎒 Inventory: {', '.join(state['inventory'])} | ✨ XP: {state.get('xp', 0)}/{state['level']*100}")
+            if state.get('companions'):
+                print(f"🤝 Companions: {', '.join(state['companions'])}")
             print("-" * 50)
             print(gm_data['narrative'])
             if gained_xp > 0:
                 print(f"\n[You gained {gained_xp} XP!]")
             print("-" * 50)
+            
+            # --- DYNAMIC MONSTER GENERATION ---
+            if gm_data.get('new_monsters_data'):
+                if "monsters" not in game_data:
+                    game_data["monsters"] = {}
+                for m_name, m_stats in gm_data['new_monsters_data'].items():
+                    game_data["monsters"][m_name] = m_stats
+                    print(f"📖 [Bestiary Updated] The GM has created a new monster: {m_name}!")
+                save_game_data(game_data)
             
             # --- LOCAL COMBAT INTERCEPT ---
             if gm_data.get('situation_type') == 'combat_start' and gm_data.get('spawned_monsters'):
@@ -47,6 +62,11 @@ def main():
                     print("\n💀 YOU HAVE FALLEN IN BATTLE. Game Over.")
                     return
                 save_game(state)
+                continue
+                
+            # --- LOCAL SKILL CHECK INTERCEPT ---
+            if gm_data.get('situation_type') == 'skill_check' and gm_data.get('required_roll'):
+                initial_action = skills.handle_skill_check(state, gm_data)
                 continue
 
             # 3. Print the choices neatly
@@ -60,7 +80,7 @@ def main():
         print("\n" + "="*50)
         
         while True:
-            action = input("\nWhat do you do? (Type 1, 2, 3, 'status', 'equip', 'shop', 'quit', or a custom action): ")
+            action = input("\nWhat do you do? (Type 1, 2, 3, 'status', 'equip', 'use', 'rest', 'shop', 'quit', or a custom action): ")
             
             if action.lower() == 'quit':
                 print("Saving and exiting...")
@@ -71,11 +91,22 @@ def main():
                 continue
             
             if action.lower() == 'shop':
-                if actions.handle_shop(state, game_data): save_game(state)
+                if state.get('can_shop', False):
+                    if actions.handle_shop(state, game_data): save_game(state)
+                else:
+                    print("\n[Failed] There are no merchants or shops nearby to trade with.")
                 continue
             
             if action.lower() == 'equip':
                 if actions.handle_equip(state): save_game(state)
+                continue
+            
+            if action.lower() == 'use':
+                if actions.handle_use(state, game_data): save_game(state)
+                continue
+            
+            if action.lower() == 'rest':
+                if actions.handle_rest(state): save_game(state)
                 continue
             
             # If the user typed a number, map it to the actual choice string

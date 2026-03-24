@@ -26,6 +26,12 @@ def generate_gm_response(state, player_action, game_data=None):
     6. "awarded_xp": An integer between 0 and 50. Award 0 for basic observation, moving, or starting out. ONLY award >0 XP for overcoming obstacles, finding secrets, or significant achievements.
     7. "situation_type": A string categorizing the current state. Must be exactly one of: "exploration", "combat_start", "social", or "skill_check".
     8. "spawned_monsters": If situation_type is "combat_start", provide a list of monster names (from game_data) that are attacking. Otherwise, return an empty list.
+    9. "can_shop": A boolean indicating if the player is in a location where they can buy or sell items (like a town, city, or merchant stall).
+    10. "required_roll": If situation_type is "skill_check", provide the 3-letter stat abbreviation required (STR, DEX, CON, INT, WIS, CHA). Otherwise, return null.
+    11. "difficulty_class": If situation_type is "skill_check", provide an integer representing the DC (e.g., 10 for easy, 15 for medium, 20 for hard). Otherwise, return null.
+    12. "is_safe": A boolean indicating if the current location is safe enough to take a Long Rest (e.g., an inn, town, or fortified camp).
+    13. "new_monsters_data": If you spawn a monster that is NOT in the provided game_data, provide a dictionary mapping the new monster's name to its stats (requires keys: "ac" (int), "hp" (int), "xp" (int), "attack" (string, e.g. "+3 to hit, 1d6+1 damage")). If the monster is already in game_data, return null.
+    14. "updated_companions": A list of strings of the names of NPCs currently traveling and fighting alongside the player. Return an empty list if alone.
     """
     
     # We pass the types config to force the API to output strict JSON

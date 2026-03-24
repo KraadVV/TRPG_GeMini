@@ -17,6 +17,10 @@ def load_game_data():
             return json.load(f)
     return {"items": {}, "monsters": {}}
 
+def save_game_data(game_data):
+    with open(GAME_DATA_FILE, "w") as f:
+        json.dump(game_data, f, indent=4)
+
 def save_game(state):
     with open(SAVE_FILE, "w") as f:
         json.dump(state, f, indent=4)
