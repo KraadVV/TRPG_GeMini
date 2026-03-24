@@ -24,6 +24,8 @@ def generate_gm_response(state, player_action, game_data=None):
     4. "updated_inventory": A list of strings of the player's new inventory (add/remove items based on the narrative).
     5. "updated_location": A string of the current location name.
     6. "awarded_xp": An integer between 0 and 50 representing experience points gained from this action (award more for overcoming challenges or clever roleplay).
+    7. "situation_type": A string categorizing the current state. Must be exactly one of: "exploration", "combat_start", "social", or "skill_check".
+    8. "spawned_monsters": If situation_type is "combat_start", provide a list of monster names (from game_data) that are attacking. Otherwise, return an empty list.
     """
     
     # We pass the types config to force the API to output strict JSON
