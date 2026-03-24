@@ -1,28 +1,26 @@
 import json
 import os
-import google.generativeai as genai
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 
-# 1. Setup API Key 
-# Replace "YOUR_API_KEY_HERE" with your actual Gemini API key.
-API_KEY = "YOUR_API_KEY_HERE"
-genai.configure(api_key=API_KEY)
+load_dotenv()
+client = genai.Client()
 
 SAVE_FILE = "save_file.json"
 
-# 2. Initialize or Load Save Data
 def load_save():
     if os.path.exists(SAVE_FILE):
         with open(SAVE_FILE, "r") as f:
             return json.load(f)
     else:
-        # Default new game state is created if no save exists
         default_state = {
             "name": "Peter",
             "hp": 20,
             "level": 1,
-            "inventory": ["Iron Sword", "Leather Armor", "3x Health Potion"],
+            "inventory": ["Iron Sword", "Leather Armor", "Health Potion"],
             "location": "The Crossroads",
-            "history": [] # Stores the last few interactions for context
+            "history": [] 
         }
         save_game(default_state)
         return default_state
@@ -31,12 +29,7 @@ def save_game(state):
     with open(SAVE_FILE, "w") as f:
         json.dump(state, f, indent=4)
 
-# 3. Call the Gemini API
 def generate_gm_response(state, player_action):
-    # Using the standard gemini model
-    model = genai.GenerativeModel('gemini-2.5-flash') 
-
-    # We build the prompt by injecting your JSON save data
     prompt = f"""
     You are the Game Master in a text-based RPG. 
     Here is the player's current character sheet and state:
@@ -44,42 +37,74 @@ def generate_gm_response(state, player_action):
     
     The player takes the following action: "{player_action}"
     
-    Respond with the narrative outcome of this action, describe the new situation, 
-    and provide 3 possible choices for the player's next move. Keep the formatting clean.
+    Process the action and return a JSON object with exactly the following keys:
+    1. "narrative": A string describing the outcome of the action and the new situation.
+    2. "choices": A list of 3 strings representing the player's next logical options.
+    3. "updated_hp": An integer of the player's new HP (subtract if they take damage, add if they heal).
+    4. "updated_inventory": A list of strings of the player's new inventory (add/remove items based on the narrative).
+    5. "updated_location": A string of the current location name.
     """
     
-    response = model.generate_content(prompt)
-    return response.text
-
-# 4. Main Game Loop
-def main():
-    print("=== CLI TRPG ENGINE INITIALIZED ===")
-    state = load_save()
-    print(f"Welcome back, {state['name']}! (HP: {state['hp']})")
-    print("Type 'quit' at any time to save and exit.\n")
+    # We pass the types config to force the API to output strict JSON
+    response = client.models.generate_content(
+        model='gemini-2.5-flash',
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+        )
+    )
     
-    # Give the GM an initial prompt to start the game
+    # Python takes the JSON string from the API and converts it into a usable dictionary
+    return json.loads(response.text)
+
+def main():
+    print("=== CLI TRPG ENGINE: AUTO-DM UPGRADE ===")
+    state = load_save()
+    
     initial_action = "Look around and assess the situation."
     
     while True:
-        print("\n[The GM is generating the scenario...]\n")
-        gm_response = generate_gm_response(state, initial_action)
-        print(gm_response)
+        print("\n[The GM is processing the world...]\n")
+        try:
+            # gm_data is now a dictionary, not just a block of text
+            gm_data = generate_gm_response(state, initial_action)
+            
+            # 1. Update the local save file instantly with the AI's math
+            state['hp'] = gm_data['updated_hp']
+            state['inventory'] = gm_data['updated_inventory']
+            state['location'] = gm_data['updated_location']
+            
+            # 2. Print the UI
+            print(f"📍 Location: {state['location']}")
+            print(f"❤️  HP: {state['hp']} | 🎒 Inventory: {', '.join(state['inventory'])}")
+            print("-" * 50)
+            print(gm_data['narrative'])
+            print("-" * 50)
+            
+            # 3. Print the choices neatly
+            for i, choice in enumerate(gm_data['choices'], 1):
+                print(f"{i}. {choice}")
+            
+        except Exception as e:
+            print(f"\n[API ERROR]: {e}")
+            break
         
         print("\n" + "="*50)
-        action = input("\nWhat do you do? (Choose an option or type your own action): ")
+        action = input("\nWhat do you do? (Type 1, 2, 3, or type a custom action): ")
         
         if action.lower() == 'quit':
             print("Saving and exiting...")
             break
         
-        # Update our action for the next loop
-        initial_action = action
+        # If the user typed a number, map it to the actual choice string
+        if action in ['1', '2', '3']:
+            initial_action = gm_data['choices'][int(action) - 1]
+        else:
+            initial_action = action
         
-        # Save a brief history so the AI remembers the flow
-        state["history"].append(action)
+        state["history"].append(initial_action)
         if len(state["history"]) > 5:
-            state["history"].pop(0) # Keep history short to avoid massive data packets
+            state["history"].pop(0) 
             
         save_game(state)
 

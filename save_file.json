@@ -1,0 +1,12 @@
+{
+    "name": "Peter",
+    "hp": 20,
+    "level": 1,
+    "inventory": [
+        "Iron Sword",
+        "Leather Armor",
+        "3x Health Potion"
+    ],
+    "location": "The Crossroads",
+    "history": []
+}
