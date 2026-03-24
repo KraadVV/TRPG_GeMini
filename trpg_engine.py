@@ -1,10 +1,11 @@
 import random
-from game_state import load_save, save_game
+from game_state import load_save, save_game, load_game_data
 from gm_engine import generate_gm_response
 
 def main():
     print("=== CLI TRPG ENGINE: AUTO-DM UPGRADE ===")
     state = load_save()
+    game_data = load_game_data()
     
     if not state:
         print("\nNo save file found. Let's create a new D&D character!")
@@ -58,6 +59,8 @@ def main():
             "hp": max_hp,
             "max_hp": max_hp,
             "level": 1,
+            "xp": 0,
+            "gold": 50,
             "stats": stats,
             "inventory": [weapon, "Adventurer's Pack", "Health Potion"],
             "location": "The Crossroads",
@@ -74,18 +77,44 @@ def main():
         print("\n[The GM is processing the world...]\n")
         try:
             # gm_data is now a dictionary, not just a block of text
-            gm_data = generate_gm_response(state, initial_action)
+            gm_data = generate_gm_response(state, initial_action, game_data)
             
             # 1. Update the local save file instantly with the AI's math
             state['hp'] = gm_data['updated_hp']
             state['inventory'] = gm_data['updated_inventory']
             state['location'] = gm_data['updated_location']
             
+            gained_xp = gm_data.get('awarded_xp', 0)
+            state['xp'] = state.get('xp', 0) + gained_xp
+            
+            level_up_occurred = False
+            xp_needed = state['level'] * 100
+            if state['xp'] >= xp_needed:
+                state['xp'] -= xp_needed
+                state['level'] += 1
+                con_mod = (state['stats']['CON'] - 10) // 2
+                hp_increase = max(1, 5 + con_mod)
+                state['max_hp'] += hp_increase
+                state['hp'] = state['max_hp'] # Fully heal on level up
+                level_up_occurred = True
+            
             # 2. Print the UI
             print(f"📍 Location: {state['location']}")
-            print(f"❤️  HP: {state['hp']} | 🎒 Inventory: {', '.join(state['inventory'])}")
+            print(f"❤️  HP: {state['hp']} | 🎒 Inventory: {', '.join(state['inventory'])} | ✨ XP: {state.get('xp', 0)}/{state['level']*100}")
             print("-" * 50)
             print(gm_data['narrative'])
+            if gained_xp > 0:
+                print(f"\n[You gained {gained_xp} XP!]")
+            if level_up_occurred:
+                print(f"\n🎉 LEVEL UP! You are now Level {state['level']}! 🎉")
+                print(f"Max HP increased by {hp_increase}. You have been fully healed!")
+                while True:
+                    stat_up = input("Choose a stat to increase by 1 (STR, DEX, CON, INT, WIS, CHA): ").upper()
+                    if stat_up in state['stats']:
+                        state['stats'][stat_up] += 1
+                        print(f"Your {stat_up} is now {state['stats'][stat_up]}!")
+                        break
+                    print("Invalid stat. Please try again.")
             print("-" * 50)
             
             # 3. Print the choices neatly
@@ -99,7 +128,7 @@ def main():
         print("\n" + "="*50)
         
         while True:
-            action = input("\nWhat do you do? (Type 1, 2, 3, 'status', 'quit', or a custom action): ")
+            action = input("\nWhat do you do? (Type 1, 2, 3, 'status', 'shop', 'quit', or a custom action): ")
             
             if action.lower() == 'quit':
                 print("Saving and exiting...")
@@ -108,14 +137,33 @@ def main():
             if action.lower() in ['status', 'inventory', 'stats']:
                 print("\n=== CHARACTER STATUS ===")
                 print(f"Name: {state['name']}")
-                print(f"Race: {state.get('race', 'Unknown')} | Class: {state.get('class', 'Unknown')} | Level: {state['level']}")
-                print(f"HP: {state['hp']}/{state.get('max_hp', state['hp'])}")
+                print(f"Race: {state.get('race', 'Unknown')} | Class: {state.get('class', 'Unknown')} | Level: {state['level']} (XP: {state.get('xp', 0)}/{state['level']*100})")
+                print(f"HP: {state['hp']}/{state.get('max_hp', state['hp'])} | Gold: {state.get('gold', 0)} GP")
                 if 'stats' in state:
                     s = state['stats']
                     print(f"STR: {s['STR']} | DEX: {s['DEX']} | CON: {s['CON']} | INT: {s['INT']} | WIS: {s['WIS']} | CHA: {s['CHA']}")
                 print(f"Location: {state['location']}")
                 print(f"Inventory: {', '.join(state['inventory'])}")
                 print("========================")
+                continue
+            
+            if action.lower() == 'shop':
+                print("\n=== LOCAL SHOP ===")
+                print(f"Your Gold: {state.get('gold', 0)} GP")
+                items = game_data.get("items", {})
+                for item, details in items.items():
+                    print(f"- {item}: {details['price']} GP ({details['description']})")
+                
+                buy_choice = input("\nEnter the name of the item to buy (or press Enter to cancel): ").title()
+                if buy_choice in items:
+                    price = items[buy_choice]["price"]
+                    if state.get("gold", 0) >= price:
+                        state["gold"] = state.get("gold", 0) - price
+                        state["inventory"].append(buy_choice)
+                        print(f"\n[Success] You bought a {buy_choice} for {price} GP!")
+                        save_game(state)
+                    else:
+                        print("\n[Failed] Not enough gold!")
                 continue
             
             # If the user typed a number, map it to the actual choice string

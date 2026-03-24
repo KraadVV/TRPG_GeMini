@@ -1,0 +1,13 @@
+{
+    "items": {
+        "Health Potion": {"price": 50, "description": "Heals 2d4+2 HP"},
+        "Iron Sword": {"price": 15, "description": "1d8 slashing damage"},
+        "Leather Armor": {"price": 10, "description": "AC 11 + DEX"},
+        "Dagger": {"price": 2, "description": "1d4 piercing damage"}
+    },
+    "monsters": {
+        "Goblin": {"ac": 15, "hp": 7, "xp": 50, "attack": "+4 to hit, 1d6+2 damage"},
+        "Orc": {"ac": 13, "hp": 15, "xp": 100, "attack": "+5 to hit, 1d12+3 damage"},
+        "Bandit": {"ac": 12, "hp": 11, "xp": 25, "attack": "+3 to hit, 1d6+1 damage"}
+    }
+}
