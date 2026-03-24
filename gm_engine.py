@@ -23,7 +23,7 @@ def generate_gm_response(state, player_action, game_data=None):
     3. "updated_hp": An integer of the player's new HP (subtract if they take damage, add if they heal).
     4. "updated_inventory": A list of strings of the player's new inventory (add/remove items based on the narrative).
     5. "updated_location": A string of the current location name.
-    6. "awarded_xp": An integer between 0 and 50 representing experience points gained from this action (award more for overcoming challenges or clever roleplay).
+    6. "awarded_xp": An integer between 0 and 50. Award 0 for basic observation, moving, or starting out. ONLY award >0 XP for overcoming obstacles, finding secrets, or significant achievements.
     7. "situation_type": A string categorizing the current state. Must be exactly one of: "exploration", "combat_start", "social", or "skill_check".
     8. "spawned_monsters": If situation_type is "combat_start", provide a list of monster names (from game_data) that are attacking. Otherwise, return an empty list.
     """

@@ -1,7 +1,9 @@
 def show_status(state):
     print("\n=== CHARACTER STATUS ===")
     print(f"Name: {state['name']}")
-    print(f"Race: {state.get('race', 'Unknown')} | Class: {state.get('class', 'Unknown')} | Level: {state['level']} (XP: {state.get('xp', 0)}/{state['level']*100})")
+    print(f"Race: {state.get('race', 'Unknown')} | Class: {state.get('class', 'Unknown')} | Background: {state.get('background', 'Unknown')} | Level: {state['level']} (XP: {state.get('xp', 0)}/{state['level']*100})")
+    print(f"Appearance: {state.get('appearance', 'Not specified')}")
+    print(f"Backstory: {state.get('backstory', 'Not specified')}")
     print(f"HP: {state['hp']}/{state.get('max_hp', state['hp'])} | AC: {state.get('ac', 10)} | Gold: {state.get('gold', 0)} GP")
     if 'stats' in state:
         s = state['stats']

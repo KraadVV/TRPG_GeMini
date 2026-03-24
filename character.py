@@ -12,8 +12,31 @@ def get_proper_stats(c_class):
 def create_character():
     print("\nNo save file found. Let's create a new D&D character!")
     name = input("Enter your character's name: ")
-    race = input("Choose your race (e.g., Human, Elf, Dwarf, Orc): ")
-    char_class = input("Choose your class (e.g., Fighter, Wizard, Rogue, Cleric): ")
+    
+    print("\n--- Choose Your Heritage ---")
+    print("Your race grants you unique physical traits and cultural backgrounds.")
+    print("- Human: Adaptable, ambitious, and diverse, found in every corner of the world.")
+    print("- Elf: Graceful, long-lived, and attuned to the magical weave of nature.")
+    print("- Dwarf: Hardy and traditional, known for their resilience and skill in crafting.")
+    print("- Orc (or Half-Orc): Fierce and strong warriors with a culture deeply tied to survival and honor.")
+    print("- Halfling: Small and lucky folk who prefer peace, comfort, and sometimes stealth.")
+    print("- Dragonborn: Proud draconic humanoids with a potent breath weapon and strong clan loyalties.")
+    race = input("Choose your race (or type another of your choice): ")
+    
+    print("\n--- Choose Your Path ---")
+    print("In the world of D&D, you can choose your class to define your skills and combat style.")
+    print("- Fighter: Masters of martial combat, skilled with a variety of weapons and armor.")
+    print("- Rogue: Stealthy tricksters who rely on precision, stealth, and exploiting enemy weaknesses.")
+    print("- Wizard: Scholarly magic-users capable of manipulating the structures of reality.")
+    print("- Cleric: Priestly champions who wield divine magic in service of a higher power.")
+    print("- Bard: Inspiring magicians whose power echoes the music of creation. Sometimes, bards use their charm to avoid fights entirely.")
+    print("- Paladin: Holy warriors bound to a sacred oath, blending martial prowess with divine magic.")
+    char_class = input("Choose your class: ")
+    
+    print("\n--- Narrative Details ---")
+    background = input("Enter your character's background (e.g., Soldier, Criminal, Noble, Acolyte): ")
+    appearance = input("Describe your character's appearance: ")
+    backstory = input("Write a brief backstory for your character: ")
     
     print("\nHow would you like to generate your Ability Scores?")
     print("1. Manual  (Enter them yourself)")
@@ -46,7 +69,9 @@ def create_character():
     dex_mod = (stats["DEX"] - 10) // 2
     
     state = {
-        "name": name, "race": race, "class": char_class, "ac": 10 + dex_mod,
+        "name": name, "race": race, "class": char_class,
+        "background": background, "appearance": appearance, "backstory": backstory,
+        "ac": 10 + dex_mod,
         "equipped_weapon": weapon, "equipped_armor": "None",
         "hp": max_hp, "max_hp": max_hp, "level": 1, "xp": 0, "gold": 50,
         "stats": stats, "inventory": [weapon, "Adventurer's Pack", "Health Potion"],
