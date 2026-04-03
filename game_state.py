@@ -15,7 +15,7 @@ def load_game_data():
     if os.path.exists(GAME_DATA_FILE):
         with open(GAME_DATA_FILE, "r") as f:
             return json.load(f)
-    return {"items": {}, "monsters": {}}
+    return {"items": {}, "monsters": {}, "spells": {}}
 
 def save_game_data(game_data):
     with open(GAME_DATA_FILE, "w") as f:

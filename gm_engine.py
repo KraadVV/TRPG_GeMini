@@ -32,6 +32,8 @@ def generate_gm_response(state, player_action, game_data=None):
     12. "is_safe": A boolean indicating if the current location is safe enough to take a Long Rest (e.g., an inn, town, or fortified camp).
     13. "new_monsters_data": If you spawn a monster that is NOT in the provided game_data, provide a dictionary mapping the new monster's name to its stats (requires keys: "ac" (int), "hp" (int), "xp" (int), "attack" (string, e.g. "+3 to hit, 1d6+1 damage")). If the monster is already in game_data, return null.
     14. "updated_companions": A list of strings of the names of NPCs currently traveling and fighting alongside the player. Return an empty list if alone.
+    15. "updated_spells": A list of strings of the player's currently known spells or special skills. Add to this list if they learn a new ability narratively. Return the existing list otherwise.
+    16. "new_spells_data": If the player learns a skill/spell NOT in game_data, provide a dictionary mapping its name to its stats (requires keys: "mp" (int, cost to use), "description" (string, e.g. "2d6 fire damage" or "Heals 1d8 HP")). Otherwise, return null.
     """
     
     # We pass the types config to force the API to output strict JSON

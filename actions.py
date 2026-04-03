@@ -35,14 +35,31 @@ def handle_shop(state, game_data):
         else: print("\n[Failed] Not enough gold!")
     return False
 
-def handle_equip(state):
+def handle_equip(state, game_data):
     print("\n=== EQUIP ITEM ===")
     print(f"Inventory: {', '.join(state['inventory'])}")
     item_to_equip = input("Enter the name of the item to equip (or press Enter to cancel): ").title()
     if item_to_equip in state['inventory']:
         slot = input("Equip as (W)eapon or (A)rmor? ").lower()
-        if slot == 'w': state['equipped_weapon'] = item_to_equip; print(f"Equipped {item_to_equip} as your weapon."); return True
-        elif slot == 'a': state['equipped_armor'] = item_to_equip; print(f"Equipped {item_to_equip} as your armor."); return True
+        if slot == 'w': 
+            state['equipped_weapon'] = item_to_equip
+            print(f"Equipped {item_to_equip} as your weapon.")
+            return True
+        elif slot == 'a': 
+            state['equipped_armor'] = item_to_equip
+            print(f"Equipped {item_to_equip} as your armor.")
+            
+            # Calculate new AC
+            dex_mod = (state['stats'].get('DEX', 10) - 10) // 2
+            base_ac = 10
+            item_info = game_data.get('items', {}).get(item_to_equip)
+            if item_info:
+                ac_match = re.search(r'AC (\d+)', item_info.get('description', ''))
+                if ac_match:
+                    base_ac = int(ac_match.group(1))
+            state['ac'] = base_ac + dex_mod
+            print(f"Your AC is now {state['ac']}.")
+            return True
     elif item_to_equip:
         print("\n[Failed] You don't have that item in your inventory.")
     return False

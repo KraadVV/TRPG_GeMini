@@ -9,5 +9,6 @@
         "Goblin": {"ac": 15, "hp": 7, "xp": 50, "attack": "+4 to hit, 1d6+2 damage"},
         "Orc": {"ac": 13, "hp": 15, "xp": 100, "attack": "+5 to hit, 1d12+3 damage"},
         "Bandit": {"ac": 12, "hp": 11, "xp": 25, "attack": "+3 to hit, 1d6+1 damage"}
-    }
+    },
+    "spells": {}
 }

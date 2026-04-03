@@ -31,13 +31,18 @@ def main():
             state['can_shop'] = gm_data.get('can_shop', False)
             state['is_safe'] = gm_data.get('is_safe', False)
             state['companions'] = gm_data.get('updated_companions', state.get('companions', []))
+            if 'updated_spells' in gm_data and gm_data['updated_spells'] is not None:
+                state['spells'] = gm_data['updated_spells']
             
             gained_xp = gm_data.get('awarded_xp', 0)
             character.check_level_up(state, gained_xp)
             
             # 2. Print the UI
             print(f"📍 Location: {state['location']}")
-            print(f"❤️  HP: {state['hp']} | 🎒 Inventory: {', '.join(state['inventory'])} | ✨ XP: {state.get('xp', 0)}/{state['level']*100}")
+            if state.get('max_mp', 0) > 0:
+                print(f"❤️  HP: {state['hp']} | 🔵 MP: {state.get('mp', 0)}/{state.get('max_mp', 0)} | 🎒 Inventory: {', '.join(state['inventory'])} | ✨ XP: {state.get('xp', 0)}/{state['level']*100}")
+            else:
+                print(f"❤️  HP: {state['hp']} | 🎒 Inventory: {', '.join(state['inventory'])} | ✨ XP: {state.get('xp', 0)}/{state['level']*100}")
             if state.get('companions'):
                 print(f"🤝 Companions: {', '.join(state['companions'])}")
             print("-" * 50)
@@ -55,6 +60,20 @@ def main():
                     print(f"📖 [Bestiary Updated] The GM has created a new monster: {m_name}!")
                 save_game_data(game_data)
             
+            # --- DYNAMIC SKILL/SPELL GENERATION ---
+            if gm_data.get('new_spells_data'):
+                if "spells" not in game_data:
+                    game_data["spells"] = {}
+                for s_name, s_stats in gm_data['new_spells_data'].items():
+                    game_data["spells"][s_name] = s_stats
+                    print(f"✨ [Skill Learned] You have mastered a new ability: {s_name}!")
+                save_game_data(game_data)
+                
+                if state.get('max_mp', 0) == 0:
+                    state['max_mp'] = 10
+                    state['mp'] = 10
+                    print("🔵 You have unlocked Mana (MP) to use your new skills!")
+
             # --- LOCAL COMBAT INTERCEPT ---
             if gm_data.get('situation_type') == 'combat_start' and gm_data.get('spawned_monsters'):
                 survived, initial_action = combat.handle_combat(state, game_data, gm_data)
@@ -98,7 +117,7 @@ def main():
                 continue
             
             if action.lower() == 'equip':
-                if actions.handle_equip(state): save_game(state)
+                if actions.handle_equip(state, game_data): save_game(state)
                 continue
             
             if action.lower() == 'use':
