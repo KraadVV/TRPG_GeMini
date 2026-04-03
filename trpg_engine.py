@@ -26,6 +26,8 @@ def main():
             
             # 1. Update the local save file instantly with the AI's math
             state['hp'] = gm_data['updated_hp']
+            if 'updated_mp' in gm_data and state.get('max_mp', 0) > 0:
+                state['mp'] = min(state['max_mp'], max(0, gm_data['updated_mp']))
             state['inventory'] = gm_data['updated_inventory']
             state['location'] = gm_data['updated_location']
             state['can_shop'] = gm_data.get('can_shop', False)

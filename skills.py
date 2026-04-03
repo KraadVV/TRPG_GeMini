@@ -1,4 +1,5 @@
 import random
+import dice
 
 def handle_skill_check(state, gm_data):
     stat = gm_data.get('required_roll')
@@ -12,7 +13,7 @@ def handle_skill_check(state, gm_data):
     input("Press Enter to roll a d20...")
     
     roll = random.randint(1, 20)
-    modifier = (state['stats'][stat] - 10) // 2
+    modifier = dice.get_modifier(state['stats'][stat])
     total = roll + modifier
     
     print(f"\nYou rolled a {roll} + {modifier} ({stat} mod) = {total}.")

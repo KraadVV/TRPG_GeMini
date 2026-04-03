@@ -1,4 +1,5 @@
 import random
+import dice
 
 def get_proper_stats(c_class):
     c = c_class.lower()
@@ -64,16 +65,27 @@ def create_character():
     
     weapon = input("\nChoose your starting weapon (e.g., Longsword, Wooden Staff, Dagger): ")
     
-    con_mod = (stats["CON"] - 10) // 2
+    con_mod = dice.get_modifier(stats["CON"])
     max_hp = max(1, 10 + con_mod)
-    dex_mod = (stats["DEX"] - 10) // 2
+    dex_mod = dice.get_modifier(stats["DEX"])
     
+    c_lower = char_class.lower()
+    if any(x in c_lower for x in ['wizard', 'sorcerer', 'warlock']):
+        max_mp = 10 + dice.get_modifier(stats["INT"] if 'wizard' in c_lower else stats["CHA"])
+    elif any(x in c_lower for x in ['cleric', 'druid', 'bard']):
+        max_mp = 10 + dice.get_modifier(stats["WIS"] if 'cleric' in c_lower or 'druid' in c_lower else stats["CHA"])
+    elif any(x in c_lower for x in ['paladin', 'ranger']):
+        max_mp = 5
+    else:
+        max_mp = 0
+
     state = {
         "name": name, "race": race, "class": char_class,
         "background": background, "appearance": appearance, "backstory": backstory,
         "ac": 10 + dex_mod,
         "equipped_weapon": weapon, "equipped_armor": "None",
         "hp": max_hp, "max_hp": max_hp, "level": 1, "xp": 0, "gold": 50,
+        "mp": max_mp, "max_mp": max_mp, "spells": [],
         "stats": stats, "inventory": [weapon, "Adventurer's Pack", "Health Potion"],
         "location": "The Town", "history": [], "companions": []
     }
@@ -86,10 +98,15 @@ def check_level_up(state, gained_xp):
     if state['xp'] >= xp_needed:
         state['xp'] -= xp_needed
         state['level'] += 1
-        hp_increase = max(1, 5 + ((state['stats']['CON'] - 10) // 2))
+        hp_increase = max(1, 5 + dice.get_modifier(state['stats']['CON']))
         state['max_hp'] += hp_increase
         state['hp'] = state['max_hp']
-        print(f"\n🎉 LEVEL UP! You are now Level {state['level']}! 🎉\nMax HP increased by {hp_increase}. You have been fully healed!")
+        
+        if state.get('max_mp', 0) > 0:
+            state['max_mp'] += max(1, 2 + dice.get_modifier(state['stats']['INT']))
+            state['mp'] = state['max_mp']
+            
+        print(f"\n🎉 LEVEL UP! You are now Level {state['level']}! 🎉\nMax HP increased by {hp_increase}.")
         while True:
             stat_up = input("Choose a stat to increase by 1 (STR, DEX, CON, INT, WIS, CHA): ").upper()
             if stat_up in state['stats']:

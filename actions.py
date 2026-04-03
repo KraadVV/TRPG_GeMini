@@ -1,5 +1,6 @@
 import re
 import random
+import dice
 
 def show_status(state):
     print("\n=== CHARACTER STATUS ===")
@@ -7,7 +8,10 @@ def show_status(state):
     print(f"Race: {state.get('race', 'Unknown')} | Class: {state.get('class', 'Unknown')} | Background: {state.get('background', 'Unknown')} | Level: {state['level']} (XP: {state.get('xp', 0)}/{state['level']*100})")
     print(f"Appearance: {state.get('appearance', 'Not specified')}")
     print(f"Backstory: {state.get('backstory', 'Not specified')}")
-    print(f"HP: {state['hp']}/{state.get('max_hp', state['hp'])} | AC: {state.get('ac', 10)} | Gold: {state.get('gold', 0)} GP")
+    if state.get('max_mp', 0) > 0:
+        print(f"HP: {state['hp']}/{state.get('max_hp', state['hp'])} | MP: {state.get('mp', 0)}/{state.get('max_mp', 0)} | AC: {state.get('ac', 10)} | Gold: {state.get('gold', 0)} GP")
+    else:
+        print(f"HP: {state['hp']}/{state.get('max_hp', state['hp'])} | AC: {state.get('ac', 10)} | Gold: {state.get('gold', 0)} GP")
     if 'stats' in state:
         s = state['stats']
         print(f"STR: {s['STR']} | DEX: {s['DEX']} | CON: {s['CON']} | INT: {s['INT']} | WIS: {s['WIS']} | CHA: {s['CHA']}")
@@ -16,6 +20,8 @@ def show_status(state):
     if state.get('companions'):
         print(f"Companions: {', '.join(state['companions'])}")
     print(f"Inventory: {', '.join(state['inventory'])}")
+    if state.get('spells'):
+        print(f"Known Spells: {', '.join(state['spells'])}")
     print("========================")
 
 def handle_shop(state, game_data):
@@ -50,7 +56,7 @@ def handle_equip(state, game_data):
             print(f"Equipped {item_to_equip} as your armor.")
             
             # Calculate new AC
-            dex_mod = (state['stats'].get('DEX', 10) - 10) // 2
+            dex_mod = dice.get_modifier(state['stats'].get('DEX', 10))
             base_ac = 10
             item_info = game_data.get('items', {}).get(item_to_equip)
             if item_info:
@@ -73,15 +79,7 @@ def handle_use(state, game_data):
         item_info = game_data.get('items', {}).get(item_to_use)
         if item_info and ('Heal' in item_info['description'] or 'heal' in item_info['description'].lower()):
             desc = item_info['description']
-            # Parse healing amount, e.g., 2d4+2
-            match = re.search(r'(\d+)d(\d+)\+?(\d*)', desc)
-            if match:
-                num_dice = int(match.group(1))
-                dice_sides = int(match.group(2))
-                bonus = int(match.group(3)) if match.group(3) else 0
-                heal_amount = sum(random.randint(1, dice_sides) for _ in range(num_dice)) + bonus
-            else:
-                heal_amount = 5 # Default fallback
+            heal_amount = dice.roll_from_string(desc, default_val=5)
             
             old_hp = state['hp']
             state['hp'] = min(state.get('max_hp', state['hp']), state['hp'] + heal_amount)
@@ -105,11 +103,13 @@ def handle_rest(state):
         heal_amount = max(1, state.get('max_hp', 10) // 2)
         old_hp = state['hp']
         state['hp'] = min(state.get('max_hp', state['hp']), state['hp'] + heal_amount)
+        if state.get('max_mp', 0) > 0: state['mp'] = min(state['max_mp'], state.get('mp', 0) + (state['max_mp'] // 2))
         print(f"\n[Success] You took a short rest and recovered {state['hp'] - old_hp} HP! (Current HP: {state['hp']}/{state['max_hp']})")
         return True
     elif choice == '2':
         if state.get('is_safe', False) or state.get('can_shop', False):
             state['hp'] = state.get('max_hp', state['hp'])
+            if state.get('max_mp', 0) > 0: state['mp'] = state['max_mp']
             print(f"\n[Success] You took a long rest in a safe place. You are fully healed! (Current HP: {state['hp']}/{state['max_hp']})")
             return True
         else:

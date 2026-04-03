@@ -1,6 +1,7 @@
 import random
 import re
 import actions
+import dice
 
 def handle_combat(state, game_data, gm_data):
     monsters = gm_data.get('spawned_monsters')
@@ -86,11 +87,11 @@ def handle_combat(state, game_data, gm_data):
             wpn_name = wpn.lower() if wpn and wpn != 'None' else ''
             c_class = state.get('class', '').lower()
             
-            str_mod = (state['stats']['STR'] - 10) // 2
-            dex_mod = (state['stats']['DEX'] - 10) // 2
-            int_mod = (state['stats']['INT'] - 10) // 2
-            wis_mod = (state['stats']['WIS'] - 10) // 2
-            cha_mod = (state['stats']['CHA'] - 10) // 2
+            str_mod = dice.get_modifier(state['stats']['STR'])
+            dex_mod = dice.get_modifier(state['stats']['DEX'])
+            int_mod = dice.get_modifier(state['stats']['INT'])
+            wis_mod = dice.get_modifier(state['stats']['WIS'])
+            cha_mod = dice.get_modifier(state['stats']['CHA'])
             
             spell_mod, spell_stat = int_mod, "INT"
             if any(x in c_class for x in ['cleric', 'druid', 'ranger']): spell_mod, spell_stat = wis_mod, "WIS"
@@ -111,15 +112,8 @@ def handle_combat(state, game_data, gm_data):
             print(f"\nYou rolled a {p_roll} + {combat_mod} ({stat_name} mod) + {prof_bonus} (Prof) = {p_total} to hit vs {target_name} (AC {target_data['ac']}).")
             
             if p_total >= target_data['ac']:
-                num_dice, dmg_dice, dmg_bonus = 1, 4, 0
-                if wpn and wpn in game_data.get('items', {}):
-                    desc = game_data['items'][wpn]['description']
-                    match = re.search(r'(\d+)d(\d+)\+?(\d*)', desc)
-                    if match: 
-                        num_dice = int(match.group(1))
-                        dmg_dice = int(match.group(2))
-                        dmg_bonus = int(match.group(3)) if match.group(3) else 0
-                dmg = max(1, sum(random.randint(1, dmg_dice) for _ in range(num_dice)) + dmg_bonus + combat_mod)
+                desc = game_data.get('items', {}).get(wpn, {}).get('description', '1d4') if wpn else '1d4'
+                dmg = max(1, dice.roll_from_string(desc) + combat_mod)
                 state['active_enemies'][target_name]['hp'] -= dmg
                 print(f"Hit! You deal {dmg} damage to {target_name} with your {wpn if wpn and wpn != 'None' else 'fists'}.")
                 if state['active_enemies'][target_name]['hp'] <= 0:
@@ -146,8 +140,7 @@ def handle_combat(state, game_data, gm_data):
             state['mp'] = state.get('mp', 0) - spell_data.get('mp', 0)
             
             if 'heal' in spell_data.get('description', '').lower():
-                match = re.search(r'(\d+)d(\d+)\+?(\d*)', spell_data['description'])
-                heal_amount = sum(random.randint(1, int(match.group(2))) for _ in range(int(match.group(1)))) + (int(match.group(3)) if match.group(3) else 0) if match else 5
+                heal_amount = dice.roll_from_string(spell_data.get('description', ''), default_val=5)
                 old_hp = state['hp']
                 state['hp'] = min(state.get('max_hp', state['hp']), state['hp'] + heal_amount)
                 print(f"\n✨ You use {spell_choice} and recover {state['hp'] - old_hp} HP! (Current HP: {state['hp']}/{state['max_hp']})")
@@ -169,7 +162,7 @@ def handle_combat(state, game_data, gm_data):
             target_data = game_data['monsters'][alive_enemies[target_name]['type']]
             
             # Simple skill attack roll using highest mental stat (INT/WIS/CHA)
-            int_mod, wis_mod, cha_mod = (state['stats']['INT']-10)//2, (state['stats']['WIS']-10)//2, (state['stats']['CHA']-10)//2
+            int_mod, wis_mod, cha_mod = dice.get_modifier(state['stats']['INT']), dice.get_modifier(state['stats']['WIS']), dice.get_modifier(state['stats']['CHA'])
             spell_mod = max(int_mod, wis_mod, cha_mod)
             prof_bonus = 2 + ((state.get('level', 1) - 1) // 4)
             p_total = random.randint(1, 20) + spell_mod + prof_bonus
@@ -177,8 +170,7 @@ def handle_combat(state, game_data, gm_data):
             print(f"\n✨ You use {spell_choice}! Attack Roll: {p_total - spell_mod - prof_bonus} + {spell_mod} (Stat mod) + {prof_bonus} (Prof) = {p_total} vs {target_name} (AC {target_data['ac']}).")
             
             if p_total >= target_data['ac']:
-                match = re.search(r'(\d+)d(\d+)\+?(\d*)', spell_data.get('description', '1d4'))
-                dmg = sum(random.randint(1, int(match.group(2))) for _ in range(int(match.group(1)))) + (int(match.group(3)) if match.group(3) else 0) if match else 1
+                dmg = max(1, dice.roll_from_string(spell_data.get('description', '1d4')))
                 state['active_enemies'][target_name]['hp'] -= dmg
                 print(f"Hit! 💥 {spell_choice} deals {dmg} damage to {target_name}.")
                 if state['active_enemies'][target_name]['hp'] <= 0:
@@ -214,8 +206,8 @@ def handle_combat(state, game_data, gm_data):
             if target == state['name']:
                 print(f"\n🩸 {e_name} attacks YOU! Rolls {m_roll} + {m_hit_mod} = {m_total} to hit vs your AC {state.get('ac', 10)}.")
                 if m_total >= state.get('ac', 10):
-                    dmg_match = re.search(r'1d(\d+)\+?(\d*)', m_atk_str)
-                    m_dmg = max(1, random.randint(1, int(dmg_match.group(1))) + (int(dmg_match.group(2)) if dmg_match.group(2) else 0)) if dmg_match else max(1, random.randint(1, 4))
+                    # Isolate just the damage part of the attack string to pass to our parser
+                    m_dmg = dice.roll_from_string(m_atk_str.split(',')[-1], default_val=random.randint(1, 4))
                     state['hp'] -= m_dmg
                     print(f"Ouch! {e_name} hits! You take {m_dmg} damage.")
                 else: print(f"{e_name} misses you!")
