@@ -1,14 +1,127 @@
 {
     "items": {
-        "Health Potion": {"price": 50, "description": "Heals 2d4+2 HP"},
-        "Iron Sword": {"price": 15, "description": "1d8 slashing damage"},
-        "Leather Armor": {"price": 10, "description": "AC 11 + DEX"},
-        "Dagger": {"price": 2, "description": "1d4 piercing damage"}
+        "Health Potion": {
+            "price": 25,
+            "type": "consumable",
+            "description": "Heals 2d4+2 HP"
+        },
+        "Mana Potion": {
+            "price": 20,
+            "type": "consumable",
+            "description": "Restores 2d4+2 MP"
+        },
+        "Dagger": {
+            "price": 2,
+            "type": "weapon",
+            "description": "1d4 piercing damage"
+        },
+        "Shortsword": {
+            "price": 10,
+            "type": "weapon",
+            "description": "1d6 slashing damage"
+        },
+        "Longsword": {
+            "price": 15,
+            "type": "weapon",
+            "description": "1d8 slashing damage"
+        },
+        "Greatsword": {
+            "price": 30,
+            "type": "weapon",
+            "description": "2d6 slashing damage"
+        },
+        "Longbow": {
+            "price": 50,
+            "type": "weapon",
+            "description": "1d8 piercing damage"
+        },
+        "Leather Armor": {
+            "price": 10,
+            "type": "armor",
+            "description": "AC 11 + DEX"
+        },
+        "Chain Mail": {
+            "price": 75,
+            "type": "armor",
+            "description": "AC 16"
+        },
+        "Shield": {
+            "price": 10,
+            "type": "armor",
+            "description": "AC +2"
+        }
     },
     "monsters": {
-        "Goblin": {"ac": 15, "hp": 7, "xp": 50, "attack": "+4 to hit, 1d6+2 damage"},
-        "Orc": {"ac": 13, "hp": 15, "xp": 100, "attack": "+5 to hit, 1d12+3 damage"},
-        "Bandit": {"ac": 12, "hp": 11, "xp": 25, "attack": "+3 to hit, 1d6+1 damage"}
+        "Goblin": {
+            "ac": 15,
+            "hp": 7,
+            "xp": 50,
+            "attack": "+4 to hit, 1d6+2 damage",
+            "dex": 14
+        },
+        "Orc": {
+            "ac": 13,
+            "hp": 15,
+            "xp": 100,
+            "attack": "+5 to hit, 1d12+3 damage",
+            "dex": 12
+        },
+        "Bandit": {
+            "ac": 12,
+            "hp": 11,
+            "xp": 25,
+            "attack": "+3 to hit, 1d6+1 damage",
+            "dex": 12
+        }
     },
-    "spells": {}
+    "spells": {
+        "Second Wind": {
+            "mp": 0,
+            "level": 0,
+            "is_cantrip": false,
+            "save_type": null,
+            "concentration": false,
+            "description": "Heals 1d10+1 HP"
+        },
+        "Sneak Attack": {
+            "mp": 0,
+            "level": 0,
+            "is_cantrip": false,
+            "save_type": null,
+            "concentration": false,
+            "description": "Deals 1d6 extra physical damage"
+        },
+        "Magic Missile": {
+            "mp": 4,
+            "level": 1,
+            "is_cantrip": false,
+            "save_type": null,
+            "concentration": false,
+            "description": "Deals 3d4+3 force damage"
+        },
+        "Shield (Spell)": {
+            "mp": 3,
+            "level": 1,
+            "is_cantrip": false,
+            "save_type": null,
+            "concentration": false,
+            "description": "Boosts AC by 5 for this round"
+        },
+        "Healing Word": {
+            "mp": 2,
+            "level": 1,
+            "is_cantrip": false,
+            "save_type": null,
+            "concentration": false,
+            "description": "Heals 1d4+3 HP"
+        },
+        "Sacred Flame": {
+            "mp": 0,
+            "level": 0,
+            "is_cantrip": true,
+            "save_type": "DEX",
+            "concentration": false,
+            "description": "Deals 1d8 radiant damage"
+        }
+    }
 }
