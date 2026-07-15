@@ -151,8 +151,8 @@ def create_character():
         armor = "None"
         spells = ["Magic Missile", "Shield (Spell)"]
     elif 'cleric' in c_lower:
-        weapon = "Longsword"
-        armor = "Chain Mail"
+        weapon = "Mace"
+        armor = "Scale Mail"
         spells = ["Healing Word", "Sacred Flame"]
     elif 'bard' in c_lower:
         weapon = "Shortsword"
@@ -387,6 +387,10 @@ def check_level_up(state, gained_xp):
             for feat in new_feats:
                 if feat["name"] not in state["class_features"]:
                     state["class_features"][feat["name"]] = {"uses_remaining": feat.get("max_uses", 1), "max_uses": feat.get("max_uses", 1)}
+                if feat["name"] not in state.get('spells', []):
+                    if 'spells' not in state:
+                        state['spells'] = []
+                    state['spells'].append(feat["name"])
             
             lang = state.get('language', 'Korean')
             if lang == "Korean":

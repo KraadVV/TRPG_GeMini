@@ -170,14 +170,22 @@ def main():
                     print(cli_styles.green(rem_msg))
 
             # Sync narrative properties
-            state['inventory'] = gm_data['updated_inventory']
+            # Sync narrative properties safely
+            new_inv = gm_data.get('updated_inventory', [])
+            equipped_items = [state.get('equipped_weapon'), state.get('equipped_armor'), state.get('equipped_shield')]
+            for item in equipped_items:
+                if item and item != 'None' and item not in new_inv:
+                    new_inv.append(item)
+            state['inventory'] = new_inv
+            
             state['location'] = gm_data['updated_location']
             state['can_shop'] = gm_data.get('can_shop', False)
             state['is_safe'] = gm_data.get('is_safe', False)
             state['companions'] = gm_data.get('updated_companions', state.get('companions', []))
             
             if 'updated_spells' in gm_data and gm_data['updated_spells'] is not None:
-                state['spells'] = gm_data['updated_spells']
+                new_spells = set(state.get('spells', [])) | set(gm_data['updated_spells'])
+                state['spells'] = list(new_spells)
                 
             # Level Up XP checks
             gained_xp = gm_data.get('awarded_xp', 0)
@@ -225,19 +233,31 @@ def main():
             if gm_data.get('new_monsters_data'):
                 if "monsters" not in game_data:
                     game_data["monsters"] = {}
-                for m_name, m_stats in gm_data['new_monsters_data'].items():
-                    game_data["monsters"][m_name] = validate_monster_stats(m_stats)
-                    new_mon = f"📖 [도감 등록] 새로운 몬스터를 조우했습니다: {m_name}!" if lang == "Korean" else f"📖 [Bestiary Updated] The GM created a new monster: {m_name}!"
-                    print(cli_styles.yellow(new_mon))
+                raw_mon_data = gm_data['new_monsters_data']
+                if isinstance(raw_mon_data, dict):
+                    # If AI returned stats directly without monster name key (e.g. {"ac": 12, "hp": 10})
+                    if 'ac' in raw_mon_data or 'hp' in raw_mon_data:
+                        m_name = gm_data.get('spawned_monsters', ['Spawned Monster'])[0] if gm_data.get('spawned_monsters') else 'Spawned Monster'
+                        raw_mon_data = {m_name: raw_mon_data}
+                    for m_name, m_stats in raw_mon_data.items():
+                        game_data["monsters"][m_name] = validate_monster_stats(m_stats)
+                        new_mon = f"📖 [도감 등록] 새로운 몬스터를 조우했습니다: {m_name}!" if lang == "Korean" else f"📖 [Bestiary Updated] The GM created a new monster: {m_name}!"
+                        print(cli_styles.yellow(new_mon))
                 save_game_data(game_data)
             
             if gm_data.get('new_spells_data'):
                 if "spells" not in game_data:
                     game_data["spells"] = {}
-                for s_name, s_stats in gm_data['new_spells_data'].items():
-                    game_data["spells"][s_name] = validate_spell_stats(s_stats)
-                    new_sp = f"✨ [스킬 습득] 새로운 비기를 전수받았습니다: {s_name}!" if lang == "Korean" else f"✨ [Skill Learned] Mastered a new ability: {s_name}!"
-                    print(cli_styles.yellow(new_sp))
+                raw_spell_data = gm_data['new_spells_data']
+                if isinstance(raw_spell_data, dict):
+                    # If AI returned spell details directly without name key (e.g. {"mp": 2, "description": "..."})
+                    if 'mp' in raw_spell_data or 'description' in raw_spell_data:
+                        s_name = 'New Ability'
+                        raw_spell_data = {s_name: raw_spell_data}
+                    for s_name, s_stats in raw_spell_data.items():
+                        game_data["spells"][s_name] = validate_spell_stats(s_stats)
+                        new_sp = f"✨ [스킬 습득] 새로운 비기를 전수받았습니다: {s_name}!" if lang == "Korean" else f"✨ [Skill Learned] Mastered a new ability: {s_name}!"
+                        print(cli_styles.yellow(new_sp))
                 save_game_data(game_data)
                 
                 if state.get('max_mp', 0) == 0:
@@ -268,6 +288,7 @@ def main():
             
         except Exception as e:
             print(cli_styles.red(f"\n[API ERROR]: {e}"))
+            save_game(state)
             break
         
         while True:

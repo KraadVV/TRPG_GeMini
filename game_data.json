@@ -35,20 +35,34 @@
             "type": "weapon",
             "description": "1d8 piercing damage"
         },
+        "Mace": {
+            "price": 5,
+            "type": "weapon",
+            "description": "1d6 bludgeoning damage"
+        },
         "Leather Armor": {
             "price": 10,
             "type": "armor",
-            "description": "AC 11 + DEX"
+            "description": "AC 11 + DEX",
+            "armor_type": "light"
+        },
+        "Scale Mail": {
+            "price": 50,
+            "type": "armor",
+            "description": "AC 14 + DEX (max 2)",
+            "armor_type": "medium"
         },
         "Chain Mail": {
             "price": 75,
             "type": "armor",
-            "description": "AC 16"
+            "description": "AC 16",
+            "armor_type": "heavy"
         },
         "Shield": {
             "price": 10,
             "type": "armor",
-            "description": "AC +2"
+            "description": "AC +2",
+            "armor_type": "shield"
         }
     },
     "monsters": {

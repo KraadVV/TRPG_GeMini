@@ -5,6 +5,117 @@ import dice
 import cli_styles
 import conditions
 
+def heal_player(state, amount):
+    """
+    Heals the player, handles recovery from unconsciousness/stable status.
+    """
+    if amount <= 0:
+        return
+    old_hp = state['hp']
+    state['hp'] = min(state.get('max_hp', state['hp']), state['hp'] + amount)
+    
+    # If the player was unconscious/rolling death saves and is healed
+    if old_hp == 0 and state['hp'] > 0:
+        conditions.remove_condition(state, 'unconscious')
+        state['is_stable'] = False
+        state.pop('death_saves', None)
+        lang = state.get('language', 'Korean')
+        msg = f"✨ 의식을 되찾고 일어났습니다!" if lang == "Korean" else f"✨ You have regained consciousness!"
+        print(cli_styles.green(cli_styles.bold(msg)))
+
+def damage_player(state, damage, is_crit=False):
+    """
+    Applies damage to the player, enforcing D&D 5e HP bounds, concentration checks,
+    and death saving throw failures if the player is already unconscious.
+    """
+    if damage <= 0:
+        return
+        
+    lang = state.get('language', 'Korean')
+    
+    # Concentration check
+    if state.get('concentrating_on') and state['hp'] > 0:
+        con_save_dc = max(10, damage // 2)
+        # Roll CON saving throw
+        success, total, detail = dice.make_saving_throw(state, 'CON', con_save_dc)
+        if success:
+            msg = f"🔆 집중 유지 성공! (CON 내성 굴림: {detail})" if lang == "Korean" else f"🔆 Concentration maintained! (CON Save: {detail})"
+            print(cli_styles.green(msg))
+        else:
+            msg = f"🔆 집중이 깨졌습니다! (CON 내성 굴림: {detail})" if lang == "Korean" else f"🔆 Concentration broken! (CON Save: {detail})"
+            print(cli_styles.red(msg))
+            state['concentrating_on'] = None
+
+    # Check if already at 0 HP (rolling death saves)
+    if state['hp'] <= 0:
+        # Damage at 0 HP is an automatic death save failure
+        # Critical hits are 2 failures
+        fail_count = 2 if is_crit else 1
+        state.setdefault('death_saves', {'successes': 0, 'failures': 0})
+        state['death_saves']['failures'] += fail_count
+        msg = f"⚠ 의식불명 상태에서 피해를 입었습니다! 데스 세이브 실패 횟수 +{fail_count} (현재 실패: {state['death_saves']['failures']}/3)" if lang == "Korean" else f"⚠ Damage taken while unconscious! Death save failure +{fail_count} (Total failures: {state['death_saves']['failures']}/3)"
+        print(cli_styles.red(cli_styles.bold(msg)))
+        if state['death_saves']['failures'] >= 3:
+            state['is_dead'] = True
+            death_msg = "☠ 사망하였습니다..." if lang == "Korean" else "☠ You have died..."
+            print(cli_styles.red(cli_styles.bold(death_msg)))
+        return
+
+    # Normal damage application
+    old_hp = state['hp']
+    state['hp'] -= damage
+    
+    # Check for instant death (massive damage)
+    # If remaining damage after reducing to 0 HP is >= max_hp
+    if state['hp'] <= 0:
+        excess = abs(state['hp'])
+        state['hp'] = 0
+        
+        # Unconscious condition
+        conditions.add_condition(state, 'unconscious', duration=None)
+        state['is_stable'] = False
+        state['death_saves'] = {'successes': 0, 'failures': 0}
+        
+        # Drop concentration
+        state['concentrating_on'] = None
+        
+        if excess >= state.get('max_hp', old_hp):
+            state['is_dead'] = True
+            msg = f"☠ 막대한 피해(Massive Damage, 초과 {excess})로 즉사하였습니다!" if lang == "Korean" else f"☠ You were instantly killed by Massive Damage (excess {excess})!"
+            print(cli_styles.red(cli_styles.bold(msg)))
+        else:
+            msg = f"🩸 체력이 0이 되어 쓰러졌습니다! 의식을 잃었습니다." if lang == "Korean" else f"🩸 You fell to 0 HP and became unconscious!"
+            print(cli_styles.red(cli_styles.bold(msg)))
+
+
+def can_sneak_attack(state, wpn, has_adv, has_dis):
+    """
+    Checks if a Rogue can perform a Sneak Attack under D&D 5e rules.
+    Requires: Rogue class, no sneak attack used yet this turn, no disadvantage,
+    and a weapon that is Finesse (Dagger, Shortsword, Rapier) or Ranged (Bow, Crossbow).
+    Also requires Advantage OR an ally/companion present.
+    """
+    if state.get('class') != 'Rogue':
+        return False
+    if state.get('sneak_attack_used_this_turn'):
+        return False
+    if has_dis:
+        return False
+        
+    wpn_lower = wpn.lower() if wpn else ""
+    is_finesse_or_ranged = False
+    # Check for known finesse or ranged weapons
+    if any(x in wpn_lower for x in ['dagger', 'shortsword', 'rapier', 'bow', 'crossbow']):
+        is_finesse_or_ranged = True
+        
+    if not is_finesse_or_ranged:
+        return False
+        
+    if has_adv or state.get('companions'):
+        return True
+        
+    return False
+
 def check_attack_advantage(attacker, target, is_ranged=False):
     """
     Determines if an attack has advantage or disadvantage based on conditions and armor penalty.
@@ -85,7 +196,7 @@ def apply_damage_mod(damage, damage_type, target_stats):
         print(cli_styles.cyan(f"🛡️ Target is IMMUNE to {damage_type} damage! (0 damage)"))
         return 0
     elif damage_type in resist:
-        dmg = max(1, damage // 2)
+        dmg = damage // 2
         print(cli_styles.cyan(f"🛡️ Target is RESISTANT to {damage_type} damage! Halved to {dmg}."))
         return dmg
     elif damage_type in vuln:
@@ -183,7 +294,17 @@ def handle_combat(state, game_data, gm_data):
             init_lines.append(f"{idx}. {actor['name']} ({role}) - Initiative: {actor['roll']}")
         cli_styles.draw_box("🎲 Initiative Order 🎲", init_lines, cli_styles.PURPLE)
 
-    while any(e['hp'] > 0 for e in state['active_enemies'].values()) and state['hp'] > 0:
+    while any(e['hp'] > 0 for e in state['active_enemies'].values()) and not state.get('is_dead', False):
+        # Check if party is completely defeated
+        player_down = state['hp'] <= 0
+        all_companions_down = True
+        for comp in state.get('companions', []):
+            if state.get('companion_stats', {}).get(comp, {}).get('hp', 0) > 0:
+                all_companions_down = False
+                break
+        if player_down and all_companions_down:
+            break
+            
         alive_enemies = {name: data for name, data in state['active_enemies'].items() if data['hp'] > 0}
         
         # Reset round-specific variables
@@ -239,7 +360,13 @@ def handle_combat(state, game_data, gm_data):
         for actor in state['combat_initiative']:
             # Recheck survival
             alive_enemies = {name: data for name, data in state['active_enemies'].items() if data['hp'] > 0}
-            if not alive_enemies or state['hp'] <= 0:
+            player_down = state['hp'] <= 0
+            all_companions_down = True
+            for comp in state.get('companions', []):
+                if state.get('companion_stats', {}).get(comp, {}).get('hp', 0) > 0:
+                    all_companions_down = False
+                    break
+            if not alive_enemies or state.get('is_dead') or (player_down and all_companions_down):
                 break
                 
             actor_name = actor['name']
@@ -247,6 +374,59 @@ def handle_combat(state, game_data, gm_data):
             
             # --- PLAYER TURN ---
             if actor_type == 'player':
+                if state['hp'] <= 0:
+                    if state.get('is_stable', False):
+                        stable_msg = "\n🛌 당신은 안정된 상태(Stable)로 기절해 있습니다. 턴이 자동으로 넘어갑니다." if lang == "Korean" else "\n🛌 You are stable but unconscious. Skipping your turn."
+                        print(cli_styles.cyan(stable_msg))
+                        continue
+                    
+                    # Roll Death Saving Throw
+                    title = "☠ 죽음 내성 굴림 (Death Saving Throw) ☠" if lang == "Korean" else "☠ Death Saving Throw ☠"
+                    current_saves = state.setdefault('death_saves', {'successes': 0, 'failures': 0})
+                    lines = [
+                        "체력이 0이 되어 쓰러져 있습니다. 죽음의 문턱에서 저항해야 합니다!",
+                        f"현재 상태 - 성공: {current_saves['successes']}/3, 실패: {current_saves['failures']}/3" if lang == "Korean" else f"Current Saves - Successes: {current_saves['successes']}/3, Failures: {current_saves['failures']}/3"
+                    ]
+                    cli_styles.draw_box(title, lines, cli_styles.RED)
+                    
+                    roll_prompt = "엔터를 눌러 죽음 내성 굴림(d20)을 수행하세요..." if lang == "Korean" else "Press Enter to roll a Death Saving Throw (d20)..."
+                    input(roll_prompt)
+                    
+                    roll_result = random.randint(1, 20)
+                    if roll_result == 20:
+                        state['hp'] = 1
+                        state.pop('death_saves', None)
+                        state['is_stable'] = False
+                        conditions.remove_condition(state, 'unconscious')
+                        msg = f"✨ 기적! 자연 20(Natural 20)을 굴려 1 HP로 의식을 되찾았습니다!" if lang == "Korean" else f"✨ Miracle! Rolled a Natural 20, regaining consciousness with 1 HP!"
+                        print(cli_styles.green(cli_styles.bold(msg)))
+                        # Let them proceed to take their turn normally!
+                    elif roll_result == 1:
+                        state['death_saves']['failures'] += 2
+                        msg = f"⚠️ 자연 1(Natural 1)을 굴려 데스 세이브 2회 실패! (누적 실패: {state['death_saves']['failures']}/3)" if lang == "Korean" else f"⚠️ Critical failure! Rolled a Natural 1: 2 death save failures! (Total failures: {state['death_saves']['failures']}/3)"
+                        print(cli_styles.red(cli_styles.bold(msg)))
+                    elif roll_result >= 10:
+                        state['death_saves']['successes'] += 1
+                        msg = f"✅ 성공! ({roll_result}) (누적 성공: {state['death_saves']['successes']}/3)" if lang == "Korean" else f"✅ Success! ({roll_result}) (Total successes: {state['death_saves']['successes']}/3)"
+                        print(cli_styles.green(msg))
+                    else:
+                        state['death_saves']['failures'] += 1
+                        msg = f"❌ 실패... ({roll_result}) (누적 실패: {state['death_saves']['failures']}/3)" if lang == "Korean" else f"❌ Failure... ({roll_result}) (Total failures: {state['death_saves']['failures']}/3)"
+                        print(cli_styles.red(msg))
+                        
+                    # Check death/stable conditions
+                    if state['death_saves']['failures'] >= 3:
+                        state['is_dead'] = True
+                        print(cli_styles.red(cli_styles.bold("\n☠ 결국 사망에 이르렀습니다...")))
+                        break
+                    elif state['death_saves']['successes'] >= 3:
+                        state['is_stable'] = True
+                        state.pop('death_saves', None)
+                        print(cli_styles.cyan(cli_styles.bold("\n🛌 상태가 안정(Stable)되었습니다. 더 이상 내성 굴림을 굴리지 않지만, 여전히 의식 불명 상태입니다.")))
+                        
+                    if roll_result != 20:
+                        continue # Skip normal action choices if not waking up
+                
                 if state.get('player_surprised'):
                     print(cli_styles.yellow(f"\n⚡ {actor_name} is surprised and skips their turn!"))
                     state['player_surprised'] = False
@@ -319,15 +499,15 @@ def handle_combat(state, game_data, gm_data):
                                 print(f"🗡️ {enemy_name}의 기회 공격: d20({m_detail}) + {m_hit_mod} = {m_total} vs AC {state.get('ac', 10)}")
                                 if m_total >= state.get('ac', 10):
                                     m_dmg = dice.roll_from_string(m_atk_str.split(',')[-1], default_val=random.randint(1, 4))
-                                    state['hp'] -= m_dmg
+                                    damage_player(state, m_dmg, is_crit=(m_roll == 20))
                                     print(cli_styles.red(f"💥 맞았습니다! {m_dmg} 피해! (남은 HP: {state['hp']})"))
                                 else:
                                     print(cli_styles.gray(f"💨 빗나갔습니다!"))
                                 
-                                if state['hp'] <= 0:
+                                if state.get('is_dead') or state['hp'] <= 0:
                                     break
                                     
-                        if state['hp'] <= 0:
+                        if state.get('is_dead'):
                             return False, ""
                             
                         # Flee Roll
@@ -430,13 +610,12 @@ def handle_combat(state, game_data, gm_data):
                                 print(cli_styles.green(f"💀 Savage Attacks: Critical deals +{extra_die} extra damage!"))
                                 
                             # 2.6 Rogue Sneak Attack
-                            if state.get('class') == 'Rogue' and not state.get('sneak_attack_used_this_turn'):
-                                if has_adv or state.get('companions'):
-                                    sa_dice = f"{2 * ((state['level'] + 1) // 2)}d6"
-                                    sa_dmg = dice.roll_from_string(sa_dice)
-                                    dmg += sa_dmg
-                                    state['sneak_attack_used_this_turn'] = True
-                                    print(cli_styles.green(f"🗡️ Sneak Attack! Deals +{sa_dmg} ({sa_dice}) [CRIT DOUBLE] damage!"))
+                            if can_sneak_attack(state, wpn, has_adv, has_dis):
+                                sa_dice = f"{2 * ((state['level'] + 1) // 2)}d6"
+                                sa_dmg = dice.roll_from_string(sa_dice)
+                                dmg += sa_dmg
+                                state['sneak_attack_used_this_turn'] = True
+                                print(cli_styles.green(f"🗡️ Sneak Attack! Deals +{sa_dmg} ({sa_dice}) [CRIT DOUBLE] damage!"))
                                     
                             dmg = max(1, dmg)
                             
@@ -454,13 +633,12 @@ def handle_combat(state, game_data, gm_data):
                             dmg = dice.roll_from_string(desc) + combat_mod
                             
                             # 2.6 Rogue Sneak Attack
-                            if state.get('class') == 'Rogue' and not state.get('sneak_attack_used_this_turn'):
-                                if has_adv or state.get('companions'):
-                                    sa_dice = f"{(state['level'] + 1) // 2}d6"
-                                    sa_dmg = dice.roll_from_string(sa_dice)
-                                    dmg += sa_dmg
-                                    state['sneak_attack_used_this_turn'] = True
-                                    print(cli_styles.green(f"🗡️ Sneak Attack! Deals +{sa_dmg} ({sa_dice}) damage!"))
+                            if can_sneak_attack(state, wpn, has_adv, has_dis):
+                                sa_dice = f"{(state['level'] + 1) // 2}d6"
+                                sa_dmg = dice.roll_from_string(sa_dice)
+                                dmg += sa_dmg
+                                state['sneak_attack_used_this_turn'] = True
+                                print(cli_styles.green(f"🗡️ Sneak Attack! Deals +{sa_dmg} ({sa_dice}) damage!"))
                                     
                             dmg = max(1, dmg)
                             
@@ -527,10 +705,24 @@ def handle_combat(state, game_data, gm_data):
                             heal_roll = random.randint(1, 10)
                             heal_amount = heal_roll + state['level']
                             old_hp = state['hp']
-                            state['hp'] = min(state.get('max_hp', state['hp']), state['hp'] + heal_amount)
+                            heal_player(state, heal_amount)
                             
                             print(cli_styles.green(f"\n💨 Second Wind! Recovered {state['hp'] - old_hp} HP (1d10({heal_roll}) + Fighter level {state['level']})."))
                             bonus_action_used = True
+                            continue
+                            
+                        # 2.6 Fighter Action Surge (Special Free Action)
+                        if spell_choice == "Action Surge":
+                            feat_state = state.get('class_features', {}).get('Action Surge')
+                            if feat_state and feat_state.get('uses_remaining', 0) <= 0:
+                                print(cli_styles.red("\nYou have already used Action Surge! It recovers on a rest."))
+                                continue
+                                
+                            if feat_state:
+                                feat_state['uses_remaining'] -= 1
+                                
+                            action_used = False # Reset action_used so they get another action!
+                            print(cli_styles.green("\n⚡ Action Surge! You have gained an additional action this turn! / 추가 액션을 획득했습니다!"))
                             continue
                             
                         # Standard spells consume Action
@@ -697,13 +889,7 @@ def handle_combat(state, game_data, gm_data):
                                     desc = spell_data.get('description', '1d4')
                                     dmg = dice.roll_from_string(desc) + dice.roll_from_string(desc)
                                     
-                                    if state.get('class') == 'Rogue' and not state.get('sneak_attack_used_this_turn'):
-                                        if has_adv or state.get('companions'):
-                                            sa_dice = f"{2 * ((state['level'] + 1) // 2)}d6"
-                                            sa_dmg = dice.roll_from_string(sa_dice)
-                                            dmg += sa_dmg
-                                            state['sneak_attack_used_this_turn'] = True
-                                            print(cli_styles.green(f"🗡️ Sneak Attack! Deals +{sa_dmg} ({sa_dice}) [CRIT DOUBLE] damage!"))
+
                                             
                                     dmg = max(1, dmg)
                                     
@@ -719,13 +905,7 @@ def handle_combat(state, game_data, gm_data):
                                 elif p_total >= target_stats['ac']:
                                     dmg = dice.roll_from_string(spell_data.get('description', '1d4'))
                                     
-                                    if state.get('class') == 'Rogue' and not state.get('sneak_attack_used_this_turn'):
-                                        if has_adv or state.get('companions'):
-                                            sa_dice = f"{(state['level'] + 1) // 2}d6"
-                                            sa_dmg = dice.roll_from_string(sa_dice)
-                                            dmg += sa_dmg
-                                            state['sneak_attack_used_this_turn'] = True
-                                            print(cli_styles.green(f"🗡️ Sneak Attack! Deals +{sa_dmg} ({sa_dice}) damage!"))
+
                                             
                                     dmg = max(1, dmg)
                                     
@@ -774,8 +954,14 @@ def handle_combat(state, game_data, gm_data):
                 c_roll, roll_detail = dice.roll_d20(advantage=comp_adv, disadvantage=comp_dis)
                 c_total = c_roll + comp_stats['attack_bonus']
                 
-                if c_total >= target_stats['ac'] and c_roll != 1:
-                    c_dmg = dice.roll_from_string(comp_stats['damage'])
+                is_crit = (c_roll == 20)
+                if is_crit or (c_total >= target_stats['ac'] and c_roll != 1):
+                    damage_formula = comp_stats.get('damage', '1d6+2')
+                    if is_crit:
+                        print(cli_styles.green(cli_styles.bold("💥 CRITICAL HIT! Companion attack critical double damage!")))
+                        c_dmg = dice.roll_from_string(damage_formula) + dice.roll_from_string(damage_formula)
+                    else:
+                        c_dmg = dice.roll_from_string(damage_formula)
                     
                     # 4.5 Apply Damage Resistance/Vulnerability/Immunity
                     dmg_type = get_damage_type("companion attack")
@@ -847,22 +1033,12 @@ def handle_combat(state, game_data, gm_data):
                         
                         # Apply damage resistance if petrified
                         if conditions.has_effect(state, 'damage_resistance_all'):
-                            m_dmg = max(1, m_dmg // 2)
+                            m_dmg = m_dmg // 2
                             print(cli_styles.cyan(f"🛡️ Petrified Resistance halved damage!"))
                             
-                        state['hp'] -= m_dmg
-                        dmg_msg = f"으악! {enemy_name}의 공격이 명중했습니다! {m_dmg}의 피해를 입었습니다." if lang == "Korean" else f"Ouch! {enemy_name} hits! You take {m_dmg} damage."
+                        damage_player(state, m_dmg, is_crit=(m_roll == 20))
+                        dmg_msg = f"으악! {enemy_name}의 공격이 명중했습니다! {m_dmg}의 피해를 입었습니다. (남은 HP: {state['hp']})" if lang == "Korean" else f"Ouch! {enemy_name} hits! You take {m_dmg} damage. (Remaining HP: {state['hp']})"
                         print(cli_styles.red(dmg_msg))
-                        
-                        # 3.4 Concentration Check on Damage
-                        if state.get('concentrating_on') and m_dmg > 0:
-                            con_dc = max(10, m_dmg // 2)
-                            c_success, c_total, c_detail = dice.make_saving_throw(state, 'CON', con_dc)
-                            print(f"🔆 Concentration Check (CON Save): {c_detail}")
-                            if not c_success:
-                                lost_spell = state['concentrating_on']
-                                state['concentrating_on'] = None
-                                print(cli_styles.red(f"💥 Concentration broken on {lost_spell}!"))
                     else: 
                         miss_msg = f"{enemy_name}의 공격이 당신을 빗나갔습니다!" if lang == "Korean" else f"{enemy_name} misses you!"
                         print(cli_styles.gray(miss_msg))

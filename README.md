@@ -77,3 +77,7 @@ The game automatically saves your progress to two local JSON files:
 - `game_data.json`: The world's known items and the ever-growing bestiary of monsters the AI has spawned.
 
 To start a brand new game, simply delete or rename `save_file.json`.
+
+## 📋 Version History
+
+See the [CHANGELOG.md](file:///home/kraad/Projects/TRPG_GeMini/CHANGELOG.md) file for details on recent updates and features.

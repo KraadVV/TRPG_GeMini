@@ -4,6 +4,24 @@ import dice
 import cli_styles
 import skills_data
 
+def get_armor_category(item_name, item_info):
+    if not item_info:
+        return 'light'
+    armor_type = item_info.get('armor_type')
+    if armor_type:
+        return armor_type.lower()
+        
+    name_l = item_name.lower()
+    desc_l = item_info.get('description', '').lower()
+    
+    if 'shield' in name_l:
+        return 'shield'
+    if any(x in name_l or x in desc_l for x in ['plate', 'splint', 'ring mail', 'chain mail']):
+        return 'heavy'
+    if any(x in name_l or x in desc_l for x in ['hide', 'chain shirt', 'scale mail', 'breastplate', 'half plate']):
+        return 'medium'
+    return 'light'
+
 def recalculate_ac(state, game_data):
     # Base AC is 10 + DEX mod
     dex_mod = dice.get_modifier(state['stats'].get('DEX', 10))
@@ -21,10 +39,13 @@ def recalculate_ac(state, game_data):
             match = re.search(r'AC\s+(\d+)', desc, re.IGNORECASE)
             if match:
                 base_ac = int(match.group(1))
-                if '+ DEX' in desc.upper():
+                category = get_armor_category(eq_armor, armor_info)
+                if category == 'light':
                     ac = base_ac + dex_mod
-                else:
-                    ac = base_ac  # Heavy armor doesn't add DEX
+                elif category == 'medium':
+                    ac = base_ac + min(dex_mod, 2)
+                else: # heavy
+                    ac = base_ac
                     
     # Process Shield
     if eq_shield and eq_shield != 'None':
@@ -144,12 +165,7 @@ def handle_equip(state, game_data):
             return True
         elif item_type == "armor": 
             # 4.2 Armor proficiency checks
-            armor_name = item_to_equip.lower()
-            category = 'light'
-            if 'chain' in armor_name:
-                category = 'heavy'
-            elif 'shield' in armor_name:
-                category = 'shield'
+            category = get_armor_category(item_to_equip, item_info)
                 
             profs = skills_data.CLASS_ARMOR_PROFICIENCY.get(state['class'], [])
             if category not in profs:

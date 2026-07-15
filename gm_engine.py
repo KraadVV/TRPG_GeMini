@@ -47,21 +47,21 @@ def generate_gm_response(state, player_action, game_data=None):
     
     [COMBAT & SKILL INTERCEPTS]
     15. "spawned_monsters": If situation_type is "combat_start", provide a list of monster names from game_data that are attacking. Otherwise, return an empty list.
-    16. "new_monsters_data": If you spawn a monster NOT in game_data, provide its stats as a dictionary: {{"ac": int, "hp": int, "xp": int, "attack": string (e.g., "+3 to hit, 1d6+1 damage"), "dex": int (e.g. 10 for initiative)}}. Otherwise, return null.
+    16. "new_monsters_data": If you spawn a monster NOT in game_data, provide its name and stats as a dictionary, mapping the monster name to its stats: {{"Monster Name": {{"ac": int, "hp": int, "xp": int, "attack": string (e.g., "+3 to hit, 1d6+1 damage"), "dex": int}}}}. Otherwise, return null.
     17. "required_roll": If situation_type is "skill_check", provide the 3-letter D&D stat required (STR, DEX, CON, INT, WIS, CHA). Otherwise, return null.
     18. "required_skill": If situation_type is "skill_check" and it involves a specific skill, provide its name (Athletics, Acrobatics, Sleight of Hand, Stealth, Arcana, History, Investigation, Nature, Religion, Animal Handling, Insight, Medicine, Perception, Survival, Deception, Intimidation, Performance, Persuasion). Otherwise, return null.
     19. "difficulty_class": If situation_type is "skill_check", provide the DC (Difficulty Class) integer (e.g., 10 for easy, 15 for medium, 20 for hard). Otherwise, return null.
     
     [SPELL/SKILL LEARNING]
-    20. "new_spells_data": If the player learns a new skill/spell NOT in game_data, provide its details: {{"mp": int (cost), "description": string (e.g., "Heals 1d8 HP" or "Deals 2d6 fire damage")}}
+    20. "new_spells_data": If the player learns a new skill/spell NOT in game_data, provide its name and details as a dictionary, mapping the spell/skill name to its details: {{"Spell Name": {{"mp": int (cost), "description": string (e.g., "Heals 1d8 HP"), "level": int (0 for cantrips), "is_cantrip": bool, "save_type": string/null, "concentration": bool}}}}. Otherwise, return null.
     
     [PHASE 1 - ADVANTAGE, CONDITIONS, SURPRISE]
     21. "advantage": If situation_type is "skill_check", set to true if the situation grants Advantage. Otherwise, false.
     22. "disadvantage": If situation_type is "skill_check", set to true if the situation grants Disadvantage. Otherwise, false.
     23. "player_conditions_add": A list of dictionaries representing conditions to add to the player: [{{"name": string (e.g., "poisoned"), "duration": int/null (rounds), "source": string/null}}]. Supported conditions: blinded, charmed, deafened, frightened, grappled, incapacitated, invisible, paralyzed, petrified, poisoned, prone, restrained, stunned, unconscious.
-    23. "player_conditions_remove": A list of condition names (strings) to remove from the player.
-    24. "is_surprise_round": A boolean indicating if combat_start should trigger a surprise round.
-    25. "surprised_side": A string indicating who is surprised, either "enemies" or "players" or null.
+    24. "player_conditions_remove": A list of condition names (strings) to remove from the player.
+    25. "is_surprise_round": A boolean indicating if combat_start should trigger a surprise round.
+    26. "surprised_side": A string indicating who is surprised, either "enemies" or "players" or null.
     """
     
     import time
